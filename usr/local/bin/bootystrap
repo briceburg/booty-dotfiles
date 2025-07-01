@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+# gitbooty managed
+set -eo pipefail
+
+log(){ echo "$*" >&2 ; }
+die(){ log "$*"; exit 1; }
+pkg(){ pacman -S --noconfirm --needed "$@"; }
+
+(
+  . /etc/os-release
+  [ "$NAME" = "Arch Linux" ] || die "Is this Arch Linux?"
+  [ $EUID -eq 0 ] || die "Please execute as superuser."
+)
+
+aur=(
+  keyd
+  radio-cli-bin
+  visual-studio-code-bin
+)
+
+core=(
+  acpi
+  base-devel
+  bash-completion
+  ca-certificates
+  curl
+  fakeroot # for makepkg
+  git
+  gnupg
+  libgcrypt
+  lm_sensors
+  lsof
+  man-db
+  openssh
+  pinentry
+  sudo
+  tk
+  usbutils
+)
+
+gui=(
+  barrier # kvm (synergy replacement)
+  discord
+  firefox
+  flameshot
+  gvim
+  mesa
+  mesa-demos
+  noto-fonts-emoji
+  pipewire-jack
+  pipewire-pulse
+  polkit-gnome
+  ttf-croscore
+  ttf-nerd-fonts-symbols-mono
+  ttf-roboto
+  wezterm
+  wireplumber # replaces pipewire media session
+)
+
+laptop=(
+  acpilight # xbacklight
+  powertop
+  tlp
+  x86_energy_perf_policy
+)
+
+lang=(
+  go
+  julia
+  python
+  rustup
+)
+
+util=(
+  age
+  atuin
+  ddcutil
+  eza
+  github-cli
+  gnu-netcat
+  inetutils
+  jq
+  kbfs
+  keybase
+  smartmontools
+  the_silver_searcher
+  vim
+  which
+  whois
+  yq
+)
+
+virt=(
+  dnsmasq
+  docker
+  libvirt
+)
+
+xorg=(
+  dmenu
+  lxappearance-gtk3 
+  picom # xcompmgr replacement
+  wmctrl
+  xdg-utils
+  xorg-apps
+  xorg-server
+  xorg-xinit
+  xorg-xmessage
+  xsel
+)
+
+# booty config
+bootycfg="/etc/bootystrap"
+prompt/cfg(){
+  local id="$1"
+  local default="$2"
+  [ -e "$id" ] || echo "$default" > "$id"
+  read -rp "$id? : " -i "$(cat "$id")" -e answer
+  echo "$answer" > "$id"
+
+  case "$id:$answer" in
+    laptop:1)
+      util+=( "${laptop[@]}" )
+      echo 1 > wifi
+      ;;
+    desktop_environment:xmonad)
+      gui+=( "${xorg[@]}" xmonad xmonad-contrib )
+      aur+=( xsct )
+      ;;
+    wifi:1)
+      util+=( iwd )
+      ;;
+    host:zb14x)
+      core+=( sof-firmware )
+      ;;
+  esac
+}
+mkdir -p "$bootycfg" && cd "$_"
+prompt/cfg "user" "nesta"
+prompt/cfg "timezone" "US/Mountain" # /usr/share/zoneinfo/...
+prompt/cfg "laptop" 0
+prompt/cfg "wifi" 0
+prompt/cfg "desktop_environment" "xmonad"
+prompt/cfg "host" "$(uname -n)"
+
+# sync packages and optimize mirrorlist
+cat << EOF >> /etc/pacman.conf
+[options]
+ParallelDownloads = 3
+EOF
+pkg -y reflector
+reflector_flags=(
+  --country US
+  --protocol https
+  --latest 20
+  --score 5
+  --sort rate
+  --save /etc/pacman.d/mirrorlist
+)
+echo "${reflector_flags[@]}" > /etc/xdg/reflector/reflector.conf
+systemctl enable reflector.timer # refresh mirrors weekly
+
+grep -q Reflector /etc/pacman.d/mirrorlist || {
+  log "building mirrorlist. please wait while they're rated."
+  reflector "${reflector_flags[@]}" --verbose
+}
+
+# install packages
+pkg "${core[@]}" "${lang[@]}" "${util[@]}" "${gui[@]}" "${virt[@]}"
+
+# network configuration
+systemctl enable --now systemd-resolved.service
+ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+
+# system configuration
+ln -sf "/usr/share/zoneinfo/$(cat $bootycfg/timezone)" /etc/localtime
+ln -sf /usr/bin/vim /usr/bin/vi
+[ "$(cat $bootycfg/wifi)" = "1" ] && systemctl enable --now iwd.service
+systemctl enable --now systemd-timesyncd.service
+#systemctl enable --now docker.service eats battery, look into toggling via tlp + protecting against running containers
+
+# user configuration
+user=$(cat $bootycfg/user)
+run(){ sudo -u "$user" "$@"; }
+log "configuring user: $user"
+id -u "$user" &>/dev/null || useradd --create-home  "$user"
+usermod -aG docker,log,libvirt,rfkill,video,wheel "$user"
+run mkdir -p "/home/$user/"{git/AUR,bin,tmp}
+
+[ -d "/home/$user/.gitbooty" ] || {
+   run gitbooty pull
+}
+ 
+[ -d "/home/$user/git/keybase-crypt" ] || (
+  #run systemctl --user start keybase.service
+  #run systemctl --user start kbfs.service
+  echo -e '\033[1mKEYBASE STARTED, PLEASE CONTINUE TO SETUP CRYPT\033[0m'
+  read -rp "[Enter] to resume..."
+)
+
+# install AUR packages
+run /usr/local/bin/aur-install "${aur[@]}"
+
+log "[OK] Bootstrap Complete. Remember to reload your user session to pickup changes."
