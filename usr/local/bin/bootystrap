@@ -13,8 +13,9 @@ pkg(){ pacman -S --noconfirm --needed "$@"; }
 )
 
 aur=(
-  keyd
-  radio-cli-bin
+  #keybase
+  #kbfs
+  #radio-cli-bin
   visual-studio-code-bin
 )
 
@@ -27,23 +28,25 @@ core=(
   fakeroot # for makepkg
   git
   gnupg
+  keyd
   libgcrypt
   lm_sensors
   lsof
   man-db
   openssh
   pinentry
+  screen
   sudo
   tk
   usbutils
 )
 
 gui=(
-  barrier # kvm (synergy replacement)
-  discord
+  input-leap # kvm (synergy, barrier replacement - deskflow for wayland)
+  #discord
   firefox
   flameshot
-  gvim
+  gnome-keyring
   mesa
   mesa-demos
   noto-fonts-emoji
@@ -66,7 +69,7 @@ laptop=(
 
 lang=(
   go
-  julia
+  #julia
   python
   rustup
 )
@@ -80,8 +83,6 @@ util=(
   gnu-netcat
   inetutils
   jq
-  kbfs
-  keybase
   smartmontools
   the_silver_searcher
   vim
@@ -98,6 +99,7 @@ virt=(
 
 xorg=(
   dmenu
+  dunst
   lxappearance-gtk3 
   picom # xcompmgr replacement
   wmctrl
@@ -144,7 +146,7 @@ prompt/cfg "desktop_environment" "xmonad"
 prompt/cfg "host" "$(uname -n)"
 
 # sync packages and optimize mirrorlist
-cat << EOF >> /etc/pacman.conf
+grep -qF "ParallelDownloads =" /etc/pacman.conf || cat << EOF >> /etc/pacman.conf
 [options]
 ParallelDownloads = 3
 EOF
@@ -181,24 +183,34 @@ systemctl enable --now systemd-timesyncd.service
 
 # user configuration
 user=$(cat $bootycfg/user)
-run(){ sudo -u "$user" "$@"; }
+run(){ sudo --login -u "$user" "$@"; }
 log "configuring user: $user"
-id -u "$user" &>/dev/null || useradd --create-home  "$user"
+id -u "$user" &>/dev/null || {
+  useradd --create-home  "$user"
+  passwd "$user"
+}
 usermod -aG docker,log,libvirt,rfkill,video,wheel "$user"
 run mkdir -p "/home/$user/"{git/AUR,bin,tmp}
 
 [ -d "/home/$user/.gitbooty" ] || {
-   run gitbooty pull
+  log "pulling $user's dotfiles"
+  run gitbooty pull || log "failed pulling dotfiles"
 }
- 
+
+# allow passwordless makepkg for AUR installations
+grep -qF "/usr/bin/pacman" "/etc/sudoers.d/user-$user" 2>/dev/null || cat << EOF >> "/etc/sudoers.d/user-$user"
+$user ALL=(ALL:ALL) NOPASSWD: /usr/bin/makepkg
+$user ALL=(ALL:ALL) NOPASSWD: /usr/bin/pacman
+EOF
+
+# install AUR packages
+run /usr/local/bin/aur-install "${aur[@]}"
+
 [ -d "/home/$user/git/keybase-crypt" ] || (
   #run systemctl --user start keybase.service
   #run systemctl --user start kbfs.service
   echo -e '\033[1mKEYBASE STARTED, PLEASE CONTINUE TO SETUP CRYPT\033[0m'
   read -rp "[Enter] to resume..."
 )
-
-# install AUR packages
-run /usr/local/bin/aur-install "${aur[@]}"
 
 log "[OK] Bootstrap Complete. Remember to reload your user session to pickup changes."
