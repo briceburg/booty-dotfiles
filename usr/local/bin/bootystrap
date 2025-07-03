@@ -189,7 +189,7 @@ id -u "$user" &>/dev/null || {
   useradd --create-home  "$user"
   passwd "$user"
 }
-usermod -aG docker,log,libvirt,rfkill,video,wheel "$user"
+usermod -aG docker,log,libvirt,rfkill,video,uucp,wheel "$user"
 run mkdir -p "/home/$user/"{git/AUR,bin,tmp}
 
 [ -d "/home/$user/.gitbooty" ] || {
