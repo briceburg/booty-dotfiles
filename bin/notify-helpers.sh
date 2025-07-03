@@ -12,7 +12,7 @@ case "$1" in
       batinfo="\n<b>battery</b>\n${arr[0]} (<b>${arr[1]}</b>)\n${arr[*]:2}"
     fi
 
-    wifiinfo=$(iw dev wlan0 link | awk '
+    wifiinfo=$(iw dev wlan0 link 2>/dev/null | awk '
     $1=="SSID:" {ssid = $2}
     $1=="signal:" {signal = $2$3}
     $1=="rx" {rx = $3}
