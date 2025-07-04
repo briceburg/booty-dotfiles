@@ -111,7 +111,10 @@ xorg=(
   xsel
 )
 
+xtra=()
+
 # booty config
+enable_multilib=false
 bootycfg="/etc/bootystrap"
 prompt/cfg(){
   local id="$1"
@@ -133,6 +136,7 @@ prompt/cfg(){
       util+=( iwd )
       ;;
     host:hartford)
+      enable_multilib=true
       gui+=(
         libva              # VA-API base
         intel-media-driver # VA-API NewGen/ARC Driver
@@ -142,6 +146,19 @@ prompt/cfg(){
         vulkan-intel       # Vulkan base
         vulkan-tools       # provides 'vulkaninfo' command
       )
+      xtra+=(
+        lib32-mesa
+        lib32-systemd 
+        lib32-vulkan-intel
+        steam
+        ttf-liberation
+      )
+
+      [ -e "/etc/sysctl.d/80-gamecompatibility.conf" ] || {
+        echo "vm.max_map_count = 2147483642" > /etc/sysctl.d/80-gamecompatibility.conf
+        sysctl --system
+      }
+      
       ;;
     host:zb14x)
       core+=( sof-firmware )
@@ -156,11 +173,22 @@ prompt/cfg "wifi" 0
 prompt/cfg "desktop_environment" "xmonad"
 prompt/cfg "host" "$(uname -n)"
 
-# sync packages and optimize mirrorlist
+# configure pacman.conf
 grep -qF "ParallelDownloads =" /etc/pacman.conf || cat << EOF >> /etc/pacman.conf
 [options]
 ParallelDownloads = 3
 EOF
+grep -qF "Include = /etc/pacman.d/bootystrap" /etc/pacman.conf || cat << EOF >> /etc/pacman.conf
+Include = /etc/pacman.d/bootystrap
+EOF
+
+if $enable_multilib; then
+  echo -e "[multilib]\nInclude = /etc/pacman.d/mirrorlist" > /etc/pacman.d/bootystrap
+else
+  echo > /etc/pacman.d/bootystrap
+fi
+
+# sync packages and optimize mirrorlist
 pkg -y reflector
 reflector_flags=(
   --country US
@@ -179,7 +207,7 @@ grep -q Reflector /etc/pacman.d/mirrorlist || {
 }
 
 # install packages
-pkg "${core[@]}" "${lang[@]}" "${util[@]}" "${gui[@]}" "${virt[@]}"
+pkg "${core[@]}" "${lang[@]}" "${util[@]}" "${virt[@]}" "${gui[@]}" "${xtra[@]}"
 
 # ensure system dotfiles are in place
 if [ -e /etc/bootystrap/.keep.system-dotfiles ]; then
