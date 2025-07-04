@@ -132,6 +132,17 @@ prompt/cfg(){
     wifi:1)
       util+=( iwd )
       ;;
+    host:hartford)
+      gui+=(
+        libva              # VA-API base
+        intel-media-driver # VA-API NewGen/ARC Driver
+        libva-utils        # provides 'vainfo' command
+        libvpl             # VPL base
+        vpl-gpu-rt         # VPL NewGen/ARC Driver
+        vulkan-intel       # Vulkan base
+        vulkan-tools       # provides 'vulkaninfo' command
+      )
+      ;;
     host:zb14x)
       core+=( sof-firmware )
       ;;
