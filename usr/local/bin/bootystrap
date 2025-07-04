@@ -170,6 +170,14 @@ grep -q Reflector /etc/pacman.d/mirrorlist || {
 # install packages
 pkg "${core[@]}" "${lang[@]}" "${util[@]}" "${gui[@]}" "${virt[@]}"
 
+# ensure system dotfiles are in place
+if [ -e /etc/bootystrap/.keep.system-dotfiles ]; then
+  log "gitbooty: system-dotfiles are present, skipping pull"
+else
+  gitbooty pull || \
+  die "failed to pull system dotfiles, ensure http://github.com/briceburg/gitbooty is configured"
+fi
+
 # network configuration
 systemctl enable --now systemd-resolved.service
 ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
@@ -180,6 +188,7 @@ ln -sf /usr/bin/vim /usr/bin/vi
 [ "$(cat $bootycfg/wifi)" = "1" ] && systemctl enable --now iwd.service
 systemctl enable --now systemd-timesyncd.service
 #systemctl enable --now docker.service eats battery, look into toggling via tlp + protecting against running containers
+systemctl enable --now keyd.service
 
 # user configuration
 user=$(cat $bootycfg/user)
