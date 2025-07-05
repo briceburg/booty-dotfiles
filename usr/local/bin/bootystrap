@@ -112,6 +112,9 @@ xorg=(
 )
 
 xtra=()
+postinstall(){
+  echo "postinstall not defined for this host"
+}
 
 # booty config
 enable_multilib=false
@@ -147,18 +150,41 @@ prompt/cfg(){
         vulkan-tools       # provides 'vulkaninfo' command
       )
       xtra+=(
-        lib32-mesa
-        lib32-systemd 
-        lib32-vulkan-intel
-        steam
+        cups               # printing
+        ghostscript        # printing / canon LBP6000
+        lib32-mesa         # steam
+        lib32-systemd      # steam
+        lib32-vulkan-intel # steam
+        steam              # steam
         ttf-liberation
       )
 
-      [ -e "/etc/sysctl.d/80-gamecompatibility.conf" ] || {
-        echo "vm.max_map_count = 2147483642" > /etc/sysctl.d/80-gamecompatibility.conf
-        sysctl --system
+      aur+=(
+        captdriver-git     # printing /  canon LBP6000
+      )
+
+      postinstall(){
+        local user="$1"
+
+        [ -e "/etc/sysctl.d/80-gamecompatibility.conf" ] || {
+          echo "vm.max_map_count = 2147483642" > /etc/sysctl.d/80-gamecompatibility.conf
+          sysctl --system
+        }
+
+        # configure printing
+        systemctl enable --now cups
+        usermod -aG lp "$user"
+
+        lpstat -v CanonLBP &>/dev/null || {
+          uri=$(lpinfo -v | grep usb://Canon | awk '{print $2}')
+          if [ -n "$uri" ]; then
+            log "configuring $uri"
+            lpadmin -p CanonLBP -m CanonLBP-3010-3018-3050.ppd -v "$uri" -E
+          else
+            log "failed to find printer, is it plugged in?"
+          fi
+        }
       }
-      
       ;;
     host:zb14x)
       core+=( sof-firmware )
@@ -226,8 +252,9 @@ ln -sf "/usr/share/zoneinfo/$(cat $bootycfg/timezone)" /etc/localtime
 ln -sf /usr/bin/vim /usr/bin/vi
 [ "$(cat $bootycfg/wifi)" = "1" ] && systemctl enable --now iwd.service
 systemctl enable --now systemd-timesyncd.service
-#systemctl enable --now docker.service eats battery, look into toggling via tlp + protecting against running containers
 systemctl enable --now keyd.service
+#systemctl enable --now docker.service eats battery, look into toggling via tlp + protecting against running containers
+
 
 # user configuration
 user=$(cat $bootycfg/user)
@@ -261,4 +288,8 @@ run /usr/local/bin/aur-install "${aur[@]}"
   read -rp "[Enter] to resume..."
 )
 
-log "[OK] Bootstrap Complete. Remember to reload your user session to pickup changes."
+# post-install
+log "post install: $(cat $bootycfg/host)"
+postinstall "$user"
+
+log "[OK] Bootstrap Complete"
