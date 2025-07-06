@@ -70,6 +70,8 @@ laptop=(
 lang=(
   go
   #julia
+  nodejs
+  nvm
   python
   rustup
 )
