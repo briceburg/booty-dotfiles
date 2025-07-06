@@ -14,3 +14,4 @@ alias pbpaste='xsel --clipboard --output'
 
 # proceed with fancy pants
 eval "$(atuin init bash --disable-up-arrow)"
+source /usr/share/nvm/init-nvm.sh
