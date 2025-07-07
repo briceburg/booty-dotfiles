@@ -28,6 +28,8 @@ core=(
   fakeroot # for makepkg
   git
   gnupg
+  greetd
+  greetd-tuigreet
   keyd
   libgcrypt
   lm_sensors
@@ -85,6 +87,7 @@ util=(
   gnu-netcat
   inetutils
   jq
+  ms-edit
   smartmontools
   the_silver_searcher
   vim
@@ -108,6 +111,7 @@ xorg=(
   xdg-utils
   xorg-apps
   xorg-server
+  xorg-xeyes
   xorg-xinit
   xorg-xmessage
   xsel
@@ -163,6 +167,7 @@ prompt/cfg(){
 
       aur+=(
         captdriver-git     # printing /  canon LBP6000
+        google-cloud-cli
       )
 
       postinstall(){
