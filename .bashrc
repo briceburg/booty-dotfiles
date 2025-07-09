@@ -4,9 +4,7 @@
 PATH="$HOME/bin:$PATH"
 # skip configuration if non-interactive 
 [[ $- != *i* ]] && return
-
-#PS1='[\u@\h \W]\[\e[31m\]${?#0}\[\e[0m\]\]\$ '
-source ~/liquidprompt/liquidprompt
+PS1='[\u@\h \W]\[\e[31m\]${?#0}\[\e(B\e[m\]\$ '
 alias edit='msedit'
 alias grep='grep --color=auto'
 alias ls='eza'
