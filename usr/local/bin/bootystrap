@@ -17,6 +17,7 @@ aur=(
   #kbfs
   #radio-cli-bin
   visual-studio-code-bin
+  zrok-bin
 )
 
 core=(
@@ -45,20 +46,15 @@ core=(
 
 gui=(
   input-leap # kvm (synergy, barrier replacement - deskflow for wayland)
-  #discord
   firefox
   flameshot
   gnome-keyring
   mesa
-  mesa-demos
   noto-fonts-emoji
   pipewire-jack
   pipewire-pulse
   polkit-gnome
-  ttf-croscore
-  ttf-nerd-fonts-symbols-mono
-  ttf-roboto
-  wezterm
+  warp-terminal
   wireplumber # replaces pipewire media session
 )
 
@@ -88,6 +84,7 @@ util=(
   inetutils
   jq
   ms-edit
+  python-black
   smartmontools
   the_silver_searcher
   vim
@@ -118,6 +115,7 @@ xorg=(
 )
 
 xtra=()
+
 postinstall(){
   echo "postinstall not defined for this host"
 }
@@ -207,11 +205,8 @@ prompt/cfg "desktop_environment" "xmonad"
 prompt/cfg "host" "$(uname -n)"
 
 # configure pacman.conf
-grep -qF "ParallelDownloads =" /etc/pacman.conf || cat << EOF >> /etc/pacman.conf
-[options]
-ParallelDownloads = 3
-EOF
 grep -qF "Include = /etc/pacman.d/bootystrap" /etc/pacman.conf || cat << EOF >> /etc/pacman.conf
+
 Include = /etc/pacman.d/bootystrap
 EOF
 
@@ -220,6 +215,17 @@ if $enable_multilib; then
 else
   echo > /etc/pacman.d/bootystrap
 fi
+
+# add warp.dev pacman repository and keys
+grep -qF "[warpdotdev]" /etc/pacman.conf || cat << EOF >> /etc/pacman.conf
+
+[warpdotdev]
+Server = https://releases.warp.dev/linux/pacman/\$repo/\$arch
+EOF
+pacman-key -f linux-maintainers@warp.dev || {
+  pacman-key -r "linux-maintainers@warp.dev"
+  pacman-key --lsign-key "linux-maintainers@warp.dev"
+}
 
 # sync packages and optimize mirrorlist
 pkg -y reflector
@@ -261,7 +267,6 @@ ln -sf /usr/bin/vim /usr/bin/vi
 systemctl enable --now systemd-timesyncd.service
 systemctl enable --now keyd.service
 #systemctl enable --now docker.service eats battery, look into toggling via tlp + protecting against running containers
-
 
 # user configuration
 user=$(cat $bootycfg/user)
